@@ -48,6 +48,8 @@ Desde el botón **Editar > Pegar plan de otra carrera**, pegás la tabla del pla
 - **Header de columnas**: detecta columnas de créditos, horas semanales y horas totales
 - **Materias**: filas con nombre + al menos un valor numérico (créditos, horas, etc.)
 - **Orientaciones**: detecta `Cursos Orientados en/de ...` y te deja elegir cuál seguís
+Ejemplo: https://www.unq.edu.ar/carrera/81-licenciatura-en-artes-digitales/
+<img width="850" height="658" alt="Captura de pantalla 2026-02-24 a la(s) 12 21 04 p  m" src="https://github.com/user-attachments/assets/1a909c73-0f71-4aba-9031-a2f8f1115b41" />
 
 #### Formato esperado
 
@@ -72,12 +74,14 @@ Si el parser no detecta headers de columna, intenta adivinar qué es cada númer
 
 En el mismo flujo de importación, o después desde **Editar > Actualizar aprobadas**, podés:
 
-- **Pegar desde SIU Guaraní**: el formato típico de dos líneas por materia:
+- **Pegar desde SIU Guaraní (Reportes -> Historia académica)**: el formato típico de dos líneas por materia:
   ```
   Matemática I (01033)
   Regularidad - 7 (Siete) Aprobado 15/07/2024 - Detalle
   ```
   Detecta el código, nombre y nota automáticamente.
+  Ejemplo: 
+<img width="798" height="658" alt="Captura de pantalla 2026-02-24 a la(s) 12 20 39 p  m" src="https://github.com/user-attachments/assets/8030efc0-a4a6-4919-a2b5-a3e754984822" />
 
 - **Lista simple**: una materia por línea o separadas por coma:
   ```
