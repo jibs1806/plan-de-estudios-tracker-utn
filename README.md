@@ -1,5 +1,5 @@
 # Plan de Estudios Tracker
-
+Live: https://plan-de-estudios-tracker.vercel.app/
 App web para visualizar el avance de una carrera universitaria. La idea nació de necesitar algo más claro que una planilla de Excel para ver qué materias tengo aprobadas, cuáles puedo cursar y cuáles me faltan desbloquear.
 
 Funciona con cualquier carrera — trae un preset de Lic. en Informática (UNQ) pero podés cargar el plan de tu universidad pegando la tabla directo desde la web.
