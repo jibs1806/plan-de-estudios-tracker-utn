@@ -7,9 +7,10 @@ import { getInformaticaPreset } from "@/data/curriculum";
 
 interface WelcomeScreenProps {
   onImportCustom: () => void;
+  onPresetLoaded: () => void;
 }
 
-export default function WelcomeScreen({ onImportCustom }: WelcomeScreenProps) {
+export default function WelcomeScreen({ onImportCustom, onPresetLoaded }: WelcomeScreenProps) {
   const { loadPreset } = useStore();
   const [loadingPreset, setLoadingPreset] = useState(false);
 
@@ -17,6 +18,7 @@ export default function WelcomeScreen({ onImportCustom }: WelcomeScreenProps) {
     setLoadingPreset(true);
     setTimeout(() => {
       loadPreset(getInformaticaPreset(), []);
+      onPresetLoaded();
     }, 350);
   };
 

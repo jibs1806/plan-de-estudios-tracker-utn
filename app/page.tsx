@@ -43,7 +43,7 @@ function ThemeToggle() {
 function HomeContent() {
   const { activePlan, activeApproved, plans, setActivePlan, removePlan, hydrated } = useStore();
   const [showStats, setShowStats] = useState(false);
-  const [showImport, setShowImport] = useState<false | "choose" | "paste">(false);
+  const [showImport, setShowImport] = useState<false | "choose" | "paste" | "paste-approved">(false);
   const [showPlanPicker, setShowPlanPicker] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   const [mounted, setMounted] = useState(false);
@@ -204,7 +204,10 @@ function HomeContent() {
         )}
 
         {isEmpty && (
-          <WelcomeScreen onImportCustom={() => setShowImport("paste")} />
+          <WelcomeScreen
+            onImportCustom={() => setShowImport("paste")}
+            onPresetLoaded={() => setShowImport("paste-approved")}
+          />
         )}
 
         {/* Desktop sidebar */}
@@ -244,7 +247,7 @@ function HomeContent() {
       {showImport && (
         <ImportModal
           onClose={() => setShowImport(false)}
-          initialStep={showImport === "paste" ? "paste" : "choose"}
+          initialStep={showImport === "paste" ? "paste" : showImport === "paste-approved" ? "paste-approved" : "choose"}
         />
       )}
     </main>

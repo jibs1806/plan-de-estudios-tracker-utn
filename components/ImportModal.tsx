@@ -7,7 +7,7 @@ import { parsePlan, parseApproved } from "@/lib/parser";
 import { getInformaticaPreset } from "@/data/curriculum";
 import { getApprovedIds, getSubjectState } from "@/lib/utils";
 
-type Step = "choose" | "paste" | "manage";
+type Step = "choose" | "paste" | "paste-approved" | "manage";
 
 interface ImportModalProps {
   onClose: () => void;
@@ -96,13 +96,15 @@ export default function ImportModal({ onClose, initialStep = "choose" }: ImportM
         <div className="px-5 pt-5 pb-3 flex items-start justify-between shrink-0">
           <div>
             <h2 className="font-heading text-lg font-semibold text-th-ink tracking-tight">
-              {step === "choose" ? "Plan de Estudios" : step === "paste" ? "Pegar Plan" : "Actualizar aprobadas"}
+              {step === "choose" ? "Plan de Estudios" : step === "paste" ? "Pegar Plan" : step === "paste-approved" ? "Cargar aprobadas" : "Actualizar aprobadas"}
             </h2>
             <p className="text-xs text-th-ink-3 mt-0.5">
               {step === "choose"
                 ? "Importar plan o actualizar materias aprobadas"
                 : step === "paste"
                 ? "Pega la tabla del plan y las aprobadas (SIU Guarani o lista simple)"
+                : step === "paste-approved"
+                ? "Pega tus materias aprobadas desde SIU Guarani o como lista simple"
                 : "Toca una materia para marcarla o desmarcarla"}
             </p>
           </div>
@@ -244,6 +246,8 @@ export default function ImportModal({ onClose, initialStep = "choose" }: ImportM
             </div>
           )}
 
+          {step === "paste-approved" && activePlan && <PasteApprovedStep onBack={() => setStep("choose")} onDone={onClose} />}
+
           {step === "manage" && activePlan && <ManageStep search={manageSearch} onSearchChange={setManageSearch} onBack={() => setStep("choose")} onDone={onClose} />}
         </div>
       </div>
@@ -270,6 +274,61 @@ function OptionButton({ icon, iconBg, iconColor, title, subtitle, onClick }: {
         </div>
       </div>
     </button>
+  );
+}
+
+function PasteApprovedStep({ onBack, onDone }: { onBack: () => void; onDone: () => void }) {
+  const { activePlan, setApprovedList } = useStore();
+  const [text, setText] = useState("");
+
+  const result = useMemo(() => {
+    if (!text.trim() || !activePlan) return null;
+    return parseApproved(text, activePlan.subjects);
+  }, [text, activePlan]);
+
+  const handleDone = () => {
+    if (result && result.approved.length > 0) {
+      setApprovedList(result.approved);
+    }
+    onDone();
+  };
+
+  return (
+    <div className="space-y-4 mt-2">
+      <textarea
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+        placeholder={"Formato SIU Guarani:\nMatematica I (01033)\nRegularidad - 7 (Siete) Aprobado 15/07/2024 - Detalle\n\nO lista simple:\nMatematica I\nProgramacion"}
+        rows={8}
+        autoFocus
+        className={TEXTAREA_CLS}
+      />
+
+      {result && (
+        <div className="rounded-xl bg-th-subtle border border-th-border p-3 space-y-1.5">
+          {result.approved.length > 0 && (
+            <p className="text-xs text-emerald-600 dark:text-emerald-400">
+              {result.approved.length} aprobada{result.approved.length !== 1 ? "s" : ""} encontrada{result.approved.length !== 1 ? "s" : ""}
+              {result.approved.filter((a) => a.grade !== null).length > 0 &&
+                ` (${result.approved.filter((a) => a.grade !== null).length} con nota)`}
+            </p>
+          )}
+          {result.notFound.map((name, i) => (
+            <p key={i} className="text-xs text-amber-600 dark:text-amber-400">No encontrada: &ldquo;{name}&rdquo;</p>
+          ))}
+        </div>
+      )}
+
+      <div className="flex items-center gap-2 pt-1">
+        <button onClick={onBack} className="text-xs text-th-ink-2 hover:text-th-ink px-3 py-2 transition-colors">Volver</button>
+        <button
+          onClick={handleDone}
+          className="flex-1 text-sm font-medium px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white transition-all duration-200"
+        >
+          {result && result.approved.length > 0 ? `Cargar ${result.approved.length} aprobada${result.approved.length !== 1 ? "s" : ""}` : "Omitir"}
+        </button>
+      </div>
+    </div>
   );
 }
 
