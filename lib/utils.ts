@@ -102,21 +102,20 @@ export function calculateStats(
     const c = counters.get(n.id);
     if (!c) continue;
 
-    const blocked = c.total - c.approved - c.available;
-
-    totalSubjects += c.total;
-    totalApproved += c.approved;
-    totalAvailable += c.available;
-    totalBlocked += blocked;
-    totalCredits += c.credits;
-    totalApprovedCredits += c.approvedCredits;
-
     if (n.minRequired !== null) {
       const reqTotal = n.minRequired;
       const avgCredits = c.total > 0 ? Math.round(c.credits / c.total) : 8;
       const reqCredits = reqTotal * avgCredits;
       const cappedApproved = Math.min(c.approved, reqTotal);
       const cappedAvailable = Math.min(c.available, reqTotal - cappedApproved);
+      const cappedBlocked = reqTotal - cappedApproved - cappedAvailable;
+
+      totalSubjects += reqTotal;
+      totalApproved += cappedApproved;
+      totalAvailable += cappedAvailable;
+      totalBlocked += cappedBlocked;
+      totalCredits += reqCredits;
+      totalApprovedCredits += Math.min(c.approvedCredits, reqCredits);
 
       byNucleus.push({
         nucleusId: n.id,
@@ -131,6 +130,15 @@ export function calculateStats(
         approvedCredits: Math.min(c.approvedCredits, reqCredits),
       });
     } else {
+      const blocked = c.total - c.approved - c.available;
+
+      totalSubjects += c.total;
+      totalApproved += c.approved;
+      totalAvailable += c.available;
+      totalBlocked += blocked;
+      totalCredits += c.credits;
+      totalApprovedCredits += c.approvedCredits;
+
       byNucleus.push({
         nucleusId: n.id,
         label: n.label,
