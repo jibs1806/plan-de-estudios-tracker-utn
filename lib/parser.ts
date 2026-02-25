@@ -218,9 +218,25 @@ function parsePlanDeEstudios(text: string): ParsePlanResult {
     contentLines.push(line);
   }
 
-  // Regexes for subject parsing
-  const CODE_RE = /^(\d{4,5})\s+(.+)$/;
-  const DATA_RE = /^(\d)\s+(.+)\s+(\d+[.,]\d+)\s+(\d+[.,]\d+)\s*$/;
+  // Full-line regex: code + name + year + correlatives + hSem + hTot all on one line
+  // Example: "02400 MATEMATICA I 1 --- 8.00 128.00"
+  // Example: "02411 ECONOMIA GENERAL 2 02400 - 02404 6.00 96.00"
+  const FULL_LINE_RE = /^(\d{4,5})\s+(.+?)\s+(\d)\s+((?:---|\d{4,5}(?:\s+-\s+\d{4,5})*))\s+(\d+[.,]\d+)\s+(\d+[.,]\d+)\s*$/;
+
+  // Line with name wrapping: name fragment + code + year + ALL data on same line
+  // Example: "CONTEMPORANEA 02404 1 --- 4.00 64.00"
+  const WRAP_FULL_RE = /^(.+?)\s+(\d{4,5})\s+(\d)\s+((?:---|\d{4,5}(?:\s+-\s+\d{4,5})*))\s+(\d+[.,]\d+)\s+(\d+[.,]\d+)\s*$/;
+
+  // Line with name wrapping: name fragment + code + year only (data continues on next line)
+  // Example: "COMERCIO INTERNACIONAL 02455 4"
+  const WRAP_PARTIAL_RE = /^(.+?)\s+(\d{4,5})\s+(\d)\s*$/;
+
+  // Continuation line with correlatives + hours (no code/name)
+  // Example: "02454 - 02446 - 02445 - 02444 6.00 96.00"
+  const DATA_CONT_RE = /^((?:---|\d{4,5}(?:\s+-\s+\d{4,5})*))\s+(\d+[.,]\d+)\s+(\d+[.,]\d+)\s*$/;
+
+  // Standalone text line (name continuation for wrapped subjects)
+  const ONLY_TEXT_RE = /^[A-ZÁÉÍÓÚÑÜ][A-ZÁÉÍÓÚÑÜ\s]+$/;
 
   interface RawSubject {
     code: string;
@@ -232,50 +248,82 @@ function parsePlanDeEstudios(text: string): ParsePlanResult {
   }
 
   const rawSubjects: RawSubject[] = [];
-  let curCode: string | null = null;
-  let curName: string[] = [];
+  let pendingNameFragment: string | null = null;
+  // For 3-line splits: name+code+year parsed, waiting for correlatives+hours
+  let pendingPartial: { code: string; nameParts: string[]; year: number } | null = null;
+
+  function parseCorrelatives(corrStr: string): string[] {
+    if (corrStr === "---") return [];
+    return corrStr.split(/\s+-\s+/).map((c) => c.trim()).filter(Boolean);
+  }
 
   for (const line of contentLines) {
-    // 1. Data line closes current subject
-    const dm = line.match(DATA_RE);
-    if (dm) {
-      if (curCode) {
-        const year = parseInt(dm[1], 10);
-        const corrStr = dm[2].trim();
-        const hSem = parseFloat(dm[3].replace(",", "."));
-        const hTot = parseFloat(dm[4].replace(",", "."));
-
-        let correlatives: string[] = [];
-        if (corrStr !== "---") {
-          correlatives = corrStr.split(/\s+-\s+/).map((c) => c.trim()).filter(Boolean);
-        }
-
+    // 0. If we have a pending partial (name+code+year), expect correlatives+hours
+    if (pendingPartial) {
+      const dc = line.match(DATA_CONT_RE);
+      if (dc) {
         rawSubjects.push({
-          code: curCode,
-          nameParts: [...curName],
-          year,
-          correlatives,
-          weeklyHours: hSem,
-          totalHours: hTot,
+          ...pendingPartial,
+          correlatives: parseCorrelatives(dc[1].trim()),
+          weeklyHours: parseFloat(dc[2].replace(",", ".")),
+          totalHours: parseFloat(dc[3].replace(",", ".")),
         });
-        curCode = null;
-        curName = [];
+        pendingPartial = null;
+        pendingNameFragment = null;
+        continue;
       }
+      // Didn't get expected data line — discard partial
+      pendingPartial = null;
+    }
+
+    // 1. Try full line match (code at start, everything on one line)
+    const fm = line.match(FULL_LINE_RE);
+    if (fm) {
+      pendingNameFragment = null;
+      rawSubjects.push({
+        code: fm[1],
+        nameParts: [fm[2].trim()],
+        year: parseInt(fm[3], 10),
+        correlatives: parseCorrelatives(fm[4].trim()),
+        weeklyHours: parseFloat(fm[5].replace(",", ".")),
+        totalHours: parseFloat(fm[6].replace(",", ".")),
+      });
       continue;
     }
 
-    // 2. Code line starts a new subject
-    const cm = line.match(CODE_RE);
-    if (cm) {
-      curCode = cm[1];
-      curName = [cm[2]];
+    // 2. Try wrapped name + code + year + correlatives + hours (all on one line)
+    const wf = line.match(WRAP_FULL_RE);
+    if (wf) {
+      const nameParts = pendingNameFragment ? [pendingNameFragment, wf[1].trim()] : [wf[1].trim()];
+      pendingNameFragment = null;
+      rawSubjects.push({
+        code: wf[2],
+        nameParts,
+        year: parseInt(wf[3], 10),
+        correlatives: parseCorrelatives(wf[4].trim()),
+        weeklyHours: parseFloat(wf[5].replace(",", ".")),
+        totalHours: parseFloat(wf[6].replace(",", ".")),
+      });
       continue;
     }
 
-    // 3. Name continuation
-    if (curCode) {
-      curName.push(line);
+    // 3. Try wrapped name + code + year only (correlatives+hours on next line)
+    const wp = line.match(WRAP_PARTIAL_RE);
+    if (wp) {
+      const nameParts = pendingNameFragment ? [pendingNameFragment, wp[1].trim()] : [wp[1].trim()];
+      pendingNameFragment = null;
+      pendingPartial = { code: wp[2], nameParts, year: parseInt(wp[3], 10) };
+      continue;
     }
+
+    // 4. Standalone uppercase text = name fragment for next wrapped line
+    if (ONLY_TEXT_RE.test(line.trim())) {
+      pendingNameFragment = line.trim();
+      continue;
+    }
+
+    // 5. Unknown line, reset
+    pendingNameFragment = null;
   }
 
   // Build nuclei from years
