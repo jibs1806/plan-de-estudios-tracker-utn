@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { GraduationCap, FileText, ChevronRight } from "lucide-react";
 import { useStore } from "@/lib/store";
-import { getInformaticaPreset } from "@/data/curriculum";
+import { getUTNFRBAPreset } from "@/data/curriculum";
 
 interface WelcomeScreenProps {
   onImportCustom: () => void;
@@ -17,7 +17,7 @@ export default function WelcomeScreen({ onImportCustom, onPresetLoaded }: Welcom
   const handleLoadPreset = () => {
     setLoadingPreset(true);
     setTimeout(() => {
-      loadPreset(getInformaticaPreset(), []);
+      loadPreset(getUTNFRBAPreset(), []);
       onPresetLoaded();
     }, 350);
   };
@@ -62,15 +62,15 @@ export default function WelcomeScreen({ onImportCustom, onPresetLoaded }: Welcom
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="font-heading text-[15px] font-semibold text-th-ink tracking-tight">
-                    Lic. Informatica — UNQ
+                    Ingeniería en Sistemas — UTN FRBA 2023
                   </p>
                   <p className="text-xs text-th-ink-3 font-body mt-1 leading-relaxed">
-                    Plan pre-configurado con 60 materias y correlatividades
+                    Plan pre-configurado UTN FRBA 2023
                   </p>
                   <div className="flex items-center gap-3 mt-3">
                     <span className="inline-flex items-center gap-1.5 text-[11px] font-medium text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-500/10 px-2.5 py-1 rounded-lg">
                       <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 dark:bg-indigo-400" />
-                      60 materias
+                      56 materias
                     </span>
                     <span className="inline-flex items-center gap-1.5 text-[11px] font-medium text-th-ink-3 bg-th-hover px-2.5 py-1 rounded-lg">
                       6 nucleos

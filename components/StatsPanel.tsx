@@ -48,8 +48,9 @@ export default function StatsPanel({ stats, planName, onClose, compact }: StatsP
       </div>
 
       <div className="flex-1 overflow-y-auto px-5 pb-5 space-y-5">
-        <div className="flex gap-2">
+        <div className="grid grid-cols-2 gap-2">
           <StatCard value={stats.approved} label="Aprobadas" accent="#059669" />
+          <StatCard value={stats.regularized + stats.approved} label="Regulares" accent="#2563eb" />
           <StatCard value={stats.available} label="Habilitadas" accent="#d97706" />
           <StatCard value={stats.blocked} label="Bloqueadas" accent="#78716c" />
         </div>

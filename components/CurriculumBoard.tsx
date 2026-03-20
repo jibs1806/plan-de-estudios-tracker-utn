@@ -4,7 +4,7 @@ import { useMemo, useState, useCallback } from "react";
 import { ChevronDown, Search } from "lucide-react";
 import type { Subject, NucleusConfig, SubjectState } from "@/data/curriculum";
 import { useStore } from "@/lib/store";
-import { getApprovedIds, getSubjectState, getSubjectGrade } from "@/lib/utils";
+import { getApprovedIds, getSubjectState, getSubjectGrade, getStatusMap } from "@/lib/utils";
 import { NucleusIcon } from "@/lib/icons";
 
 const STATE_STYLES: Record<
@@ -20,6 +20,16 @@ const STATE_STYLES: Record<
     badge: "bg-emerald-100 dark:bg-emerald-500/15",
     badgeText: "text-emerald-800 dark:text-emerald-400",
     hoverBorder: "hover:border-emerald-400 dark:hover:border-emerald-500/40",
+  },
+  regularized: {
+    dot: "bg-blue-600 dark:bg-blue-400",
+    cardBg: "bg-blue-50/80 dark:bg-blue-500/[0.05]",
+    border: "border-blue-300 dark:border-blue-500/20",
+    textPrimary: "text-blue-900 dark:text-blue-200",
+    textSecondary: "text-blue-700 dark:text-blue-400/60",
+    badge: "bg-blue-100 dark:bg-blue-500/15",
+    badgeText: "text-blue-800 dark:text-blue-400",
+    hoverBorder: "hover:border-blue-400 dark:hover:border-blue-500/40",
   },
   available: {
     dot: "bg-amber-600 dark:bg-amber-400",
@@ -45,6 +55,7 @@ const STATE_STYLES: Record<
 
 const STATE_LABELS: Record<SubjectState, string> = {
   approved: "Aprobada",
+  regularized: "Regularizada",
   available: "Habilitada",
   blocked: "Bloqueada",
 };
@@ -52,6 +63,7 @@ const STATE_LABELS: Record<SubjectState, string> = {
 interface PrereqDisplay {
   name: string;
   met: boolean;
+  type?: "Reg" | "Apr";
 }
 
 interface SubjectCardData {
@@ -99,12 +111,17 @@ function SubjectCard({ subject, state, grade, prereqs }: SubjectCardData) {
             {prereqs.map((p, i) => (
               <span
                 key={i}
-                className={`text-[10px] leading-tight rounded px-1.5 py-0.5 font-body ${
+                className={`text-[10px] leading-tight rounded px-1.5 py-0.5 font-body flex items-center gap-1 ${
                   p.met
                     ? "text-emerald-700/60 dark:text-emerald-400/40 bg-emerald-500/[0.07] dark:bg-emerald-500/[0.06]"
                     : "text-th-ink-3 bg-th-hover/80"
                 }`}
               >
+                {p.type && (
+                  <span className={`font-semibold ${p.met ? "opacity-60" : "opacity-50"}`}>
+                    {p.type}
+                  </span>
+                )}
                 {p.name}
               </span>
             ))}
@@ -181,6 +198,7 @@ type FilterState = "all" | SubjectState;
 const FILTER_OPTIONS: { value: FilterState; label: string }[] = [
   { value: "all", label: "Todas" },
   { value: "approved", label: "Aprobadas" },
+  { value: "regularized", label: "Regulares" },
   { value: "available", label: "Habilitadas" },
   { value: "blocked", label: "Bloqueadas" },
 ];
@@ -193,18 +211,27 @@ export default function CurriculumBoard() {
   const cardsByNucleus = useMemo(() => {
     if (!activePlan) return [];
     const approvedIds = getApprovedIds(activeApproved);
+    const statusMap = getStatusMap(activeApproved);
     const subjectMap = new Map(activePlan.subjects.map((s) => [s.id, s]));
 
     const grouped = new Map<string, SubjectCardData[]>();
     for (const n of activePlan.nuclei) grouped.set(n.id, []);
 
     for (const subject of activePlan.subjects) {
-      const state = getSubjectState(subject, approvedIds);
+      const state = getSubjectState(subject, approvedIds, statusMap);
       const grade = getSubjectGrade(subject.id, activeApproved);
-      const prereqs = subject.prerequisites.map((pid) => ({
-        name: subjectMap.get(pid)?.name ?? pid,
-        met: approvedIds.has(pid),
-      }));
+      const prereqs: PrereqDisplay[] = [
+        ...subject.prerequisites.regularized.map((pid) => ({
+          name: subjectMap.get(pid)?.name ?? pid,
+          met: approvedIds.has(pid) || statusMap.get(pid) === "regularized",
+          type: "Reg" as const,
+        })),
+        ...subject.prerequisites.approved.map((pid) => ({
+          name: subjectMap.get(pid)?.name ?? pid,
+          met: approvedIds.has(pid),
+          type: "Apr" as const,
+        })),
+      ];
       grouped.get(subject.nucleusId)?.push({ subject, state, grade, prereqs });
     }
 
@@ -217,7 +244,7 @@ export default function CurriculumBoard() {
     let currentId: string | null = null;
 
     for (const { config, cards } of cardsByNucleus) {
-      const approved = cards.filter((c) => c.state === "approved").length;
+      const approved = cards.filter((c) => c.state === "approved" || c.state === "regularized").length;
       const required = config.minRequired ?? cards.length;
       const capped = config.minRequired !== null ? Math.min(approved, config.minRequired) : approved;
       if (capped > 0 && capped < required) currentId = config.id;
@@ -239,7 +266,13 @@ export default function CurriculumBoard() {
         const totalCards = cards.length;
         const totalApproved = cards.filter((c) => c.state === "approved").length;
         let filtered = cards;
-        if (filter !== "all") filtered = filtered.filter((c) => c.state === filter);
+        if (filter !== "all") {
+          filtered = filtered.filter((c) => 
+            filter === "regularized" 
+              ? (c.state === "regularized" || c.state === "approved") 
+              : c.state === filter
+          );
+        }
         if (q) filtered = filtered.filter((c) => c.subject.name.toLowerCase().includes(q));
         return { config, cards: filtered, totalCards, totalApproved };
       })
@@ -251,6 +284,7 @@ export default function CurriculumBoard() {
     return {
       all: all.length,
       approved: all.filter((c) => c.state === "approved").length,
+      regularized: all.filter((c) => c.state === "regularized" || c.state === "approved").length,
       available: all.filter((c) => c.state === "available").length,
       blocked: all.filter((c) => c.state === "blocked").length,
     };

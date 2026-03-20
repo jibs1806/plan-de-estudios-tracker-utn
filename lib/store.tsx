@@ -38,6 +38,25 @@ function parseState(raw: Record<string, unknown>): StoreState | null {
   const plans = raw.plans as CareerPlan[] | undefined;
   if (!plans || !Array.isArray(plans)) return null;
 
+  // Migración de correlativas del formato viejo al nuevo
+  for (const plan of plans) {
+    if (Array.isArray(plan.subjects)) {
+      for (const subject of plan.subjects) {
+        const p = subject.prerequisites as any;
+        if (Array.isArray(p)) {
+          subject.prerequisites = { regularized: p, approved: [] };
+        } else if (!p || typeof p !== "object") {
+          subject.prerequisites = { regularized: [], approved: [] };
+        } else {
+          subject.prerequisites = {
+            regularized: p.regularized || [],
+            approved: p.approved || [],
+          };
+        }
+      }
+    }
+  }
+
   const approvedByPlan = (raw.approvedByPlan ?? {}) as Record<string, ApprovedSubject[]>;
 
   return {

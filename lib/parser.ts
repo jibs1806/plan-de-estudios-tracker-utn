@@ -374,7 +374,7 @@ function parsePlanDeEstudios(text: string): ParsePlanResult {
       totalHours: raw.totalHours,
       credits: Math.round(raw.weeklyHours * 2),
       nucleusId: nucleus.id,
-      prerequisites,
+      prerequisites: { regularized: prerequisites, approved: [] },
     });
   }
 
@@ -521,7 +521,7 @@ export function parsePlan(text: string): ParsePlanResult {
       totalHours,
       credits,
       nucleusId: currentNucleus.id,
-      prerequisites: [],
+      prerequisites: { regularized: [], approved: [] },
     });
   }
 

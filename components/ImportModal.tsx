@@ -4,8 +4,8 @@ import { useState, useMemo, useEffect, type ReactNode } from "react";
 import { X, Search, Check, GraduationCap, FileText, CheckCircle } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { parsePlan, parseApproved } from "@/lib/parser";
-import { getInformaticaPreset } from "@/data/curriculum";
-import { getApprovedIds, getSubjectState } from "@/lib/utils";
+import { getUTNFRBAPreset } from "@/data/curriculum";
+import { getApprovedIds, getSubjectState, getStatusMap } from "@/lib/utils";
 
 type Step = "choose" | "paste" | "paste-approved" | "manage";
 
@@ -78,7 +78,7 @@ export default function ImportModal({ onClose, initialStep = "choose" }: ImportM
   }, [approvedText, effectiveSubjects]);
 
   const handleLoadPreset = () => {
-    loadPreset(getInformaticaPreset(), []);
+    loadPreset(getUTNFRBAPreset(), []);
     onClose();
   };
 
@@ -127,8 +127,8 @@ export default function ImportModal({ onClose, initialStep = "choose" }: ImportM
                 icon={<GraduationCap size={20} strokeWidth={1.5} />}
                 iconBg="bg-indigo-100 dark:bg-indigo-500/10"
                 iconColor="#818CF8"
-                title="Lic. Informatica — UNQ"
-                subtitle="Cargar plan pre-configurado con 60 materias"
+                title="Ingeniería en Sistemas — UTN FRBA 2023"
+                subtitle="Cargar plan pre-configurado de UTN FRBA con 56 materias"
                 onClick={handleLoadPreset}
               />
               <OptionButton
@@ -348,16 +348,21 @@ function ManageStep({ search, onSearchChange, onBack, onDone }: {
   if (!activePlan) return null;
 
   const approvedIds = getApprovedIds(localApproved);
-  const approvedCount = localApproved.length;
+  const statusMap = getStatusMap(localApproved);
+  const approvedCount = localApproved.filter(s => s.status !== "regularized").length;
   const q = search.toLowerCase().trim();
   const subjects = q
     ? activePlan.subjects.filter((s) => s.name.toLowerCase().includes(q))
     : activePlan.subjects;
 
-  const toggleLocal = (subjectId: string) => {
+  const setStatus = (subjectId: string, status: "approved" | "regularized" | "none") => {
     setLocalApproved((prev) => {
-      const idx = prev.findIndex((s) => s.id === subjectId);
-      return idx >= 0 ? prev.filter((_, i) => i !== idx) : [...prev, { id: subjectId, grade: null }];
+      if (status === "none") return prev.filter((s) => s.id !== subjectId);
+      const existing = prev.find((s) => s.id === subjectId);
+      if (existing) {
+        return prev.map((s) => (s.id === subjectId ? { ...s, status } : s));
+      }
+      return [...prev, { id: subjectId, grade: null, status }];
     });
   };
 
@@ -383,41 +388,54 @@ function ManageStep({ search, onSearchChange, onBack, onDone }: {
 
       <div className="space-y-1.5 max-h-[50vh] overflow-y-auto custom-scroll -mx-1 px-1">
         {subjects.map((subject) => {
-          const isApproved = approvedIds.has(subject.id);
-          const state = getSubjectState(subject, approvedIds);
+          const localS = localApproved.find((s) => s.id === subject.id);
+          const isApproved = localS?.status !== "regularized" && !!localS;
+          const isRegularized = localS?.status === "regularized";
+          const state = getSubjectState(subject, approvedIds, statusMap);
           const isBlocked = state === "blocked";
-          const grade = localApproved.find((s) => s.id === subject.id)?.grade ?? null;
+          const grade = localS?.grade ?? null;
 
           return (
             <div
               key={subject.id}
-              className={`flex items-center gap-3 px-3 py-2.5 rounded-xl border transition-all duration-200 ${
+              className={`flex items-center gap-2.5 px-3 py-2.5 rounded-xl border transition-all duration-200 ${
                 isApproved
                   ? "bg-emerald-50 dark:bg-emerald-500/[0.06] border-emerald-200/70 dark:border-emerald-500/20"
+                  : isRegularized
+                  ? "bg-blue-50 dark:bg-blue-500/[0.06] border-blue-200/70 dark:border-blue-500/20"
                   : isBlocked
                   ? "bg-th-subtle border-th-border-muted opacity-40"
                   : "bg-th-subtle border-th-border hover:bg-th-hover hover:border-th-border-em"
               }`}
             >
-              <button
-                onClick={() => { if (!isBlocked || isApproved) toggleLocal(subject.id); }}
-                disabled={isBlocked && !isApproved}
-                className="shrink-0 disabled:cursor-not-allowed"
-              >
-                <div className={`w-5 h-5 rounded-md border-2 flex items-center justify-center transition-all ${isApproved ? "bg-emerald-500 border-emerald-500" : "border-th-ink-3"}`}>
-                  {isApproved && <Check size={12} color="white" strokeWidth={3} />}
-                </div>
-              </button>
+              <div className="flex items-center gap-1.5 shrink-0">
+                <button
+                  onClick={() => { if (!isBlocked || isApproved || isRegularized) setStatus(subject.id, isApproved ? "none" : "approved"); }}
+                  disabled={isBlocked && !isApproved && !isRegularized}
+                  className="disabled:cursor-not-allowed"
+                  title="Aprobada"
+                >
+                  <div className={`w-5 h-5 rounded-md border-2 flex items-center justify-center transition-all ${isApproved ? "bg-emerald-500 border-emerald-500" : "border-th-ink-3 hover:border-emerald-400"}`}>
+                    {isApproved && <Check size={12} color="white" strokeWidth={3} />}
+                  </div>
+                </button>
+                <button
+                  onClick={() => { if (!isBlocked || isApproved || isRegularized) setStatus(subject.id, isRegularized ? "none" : "regularized"); }}
+                  disabled={isBlocked && !isApproved && !isRegularized}
+                  className="disabled:cursor-not-allowed"
+                  title="Regularizada"
+                >
+                  <div className={`w-5 h-5 rounded-md border-2 flex items-center justify-center transition-all ${isRegularized ? "bg-blue-500 border-blue-500 text-white font-bold text-[10px]" : "border-th-ink-3 hover:border-blue-400 text-th-ink-3 font-bold text-[10px]"}`}>
+                    R
+                  </div>
+                </button>
+              </div>
 
-              <button
-                onClick={() => { if (!isBlocked || isApproved) toggleLocal(subject.id); }}
-                disabled={isBlocked && !isApproved}
-                className="flex-1 min-w-0 text-left disabled:cursor-not-allowed"
-              >
-                <p className={`text-sm font-body truncate ${isApproved ? "text-emerald-800 dark:text-emerald-200" : isBlocked ? "text-th-ink-3" : "text-th-ink"}`}>
+              <div className="flex-1 min-w-0 text-left">
+                <p className={`text-sm font-body truncate ${isApproved ? "text-emerald-800 dark:text-emerald-200" : isRegularized ? "text-blue-800 dark:text-blue-200" : isBlocked ? "text-th-ink-3" : "text-th-ink"}`}>
                   {subject.name}
                 </p>
-              </button>
+              </div>
 
               {isApproved ? (
                 <input
@@ -439,6 +457,8 @@ function ManageStep({ search, onSearchChange, onBack, onDone }: {
                     focus:outline-none focus:border-emerald-400 dark:focus:border-emerald-500/40
                     [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                 />
+              ) : isRegularized ? (
+                <span className="text-[11px] font-bold text-blue-700 dark:text-blue-400 shrink-0 uppercase tracking-wider px-2">Regular</span>
               ) : (
                 <span className="text-[11px] tabular-nums shrink-0 text-th-ink-3">{subject.credits} cr</span>
               )}
